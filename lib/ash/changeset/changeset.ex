@@ -4732,7 +4732,7 @@ defmodule Ash.Changeset do
     |> Ash.create!()
     |> Ash.Resource.put_metadata(:join_keys, %{type: "a"})
 
-  post1 =
+  post2 =
     changeset2
     |> Ash.create!()
     |> Ash.Resource.put_metadata(:join_keys, %{type: "b"})
@@ -5483,11 +5483,24 @@ defmodule Ash.Changeset do
                   Map.get(data, attribute.name)
               end
             end
+            |> case do
+              %Ash.ForbiddenField{} -> nil
+              %Ash.NotLoaded{} -> nil
+              v -> v
+            end
 
           changeset = remove_default(changeset, attribute.name)
 
           cond do
             changeset.action_type == :create ->
+              %{
+                changeset
+                | attributes: Map.put(changeset.attributes, attribute.name, casted),
+                  defaults: changeset.defaults -- [attribute.name]
+              }
+              |> store_casted_attribute(attribute.name, casted, store_casted?)
+
+            match?(%OriginalDataNotAvailable{}, changeset.data) ->
               %{
                 changeset
                 | attributes: Map.put(changeset.attributes, attribute.name, casted),
@@ -5609,9 +5622,21 @@ defmodule Ash.Changeset do
                   Map.get(data, attribute.name)
               end
             end
+            |> case do
+              %Ash.ForbiddenField{} -> nil
+              %Ash.NotLoaded{} -> nil
+              v -> v
+            end
 
           cond do
             changeset.action_type == :create ->
+              %{
+                changeset
+                | attributes: Map.put(changeset.attributes, attribute.name, casted),
+                  defaults: changeset.defaults -- [attribute.name]
+              }
+
+            match?(%OriginalDataNotAvailable{}, changeset.data) ->
               %{
                 changeset
                 | attributes: Map.put(changeset.attributes, attribute.name, casted),
